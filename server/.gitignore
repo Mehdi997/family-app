@@ -1,0 +1,10 @@
+node_modules/
+.env
+uploads/avatars/*
+uploads/documents/*
+uploads/receipts/*
+uploads/invoices/*
+uploads/vehicles/*
+uploads/insurance/*
+!uploads/*/.gitkeep
+*.log
