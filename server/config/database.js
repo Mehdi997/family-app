@@ -23,7 +23,6 @@ const pool = new Pool({
  * Ce wrapper convertit les ? en $1, $2... et retourne [rows]
  */
 const query = async (sql, params = []) => {
-  // Convertir les placeholders ? en $1, $2, $3...
   let paramIndex = 0;
   const pgSql = sql.replace(/\?/g, () => `$${++paramIndex}`);
 
@@ -37,7 +36,6 @@ const query = async (sql, params = []) => {
 const getConnection = async () => {
   const client = await pool.connect();
 
-  // Ajouter le wrapper query au client aussi
   const originalQuery = client.query.bind(client);
   client.query = async (sql, params = []) => {
     let paramIndex = 0;
@@ -49,7 +47,13 @@ const getConnection = async () => {
   client.beginTransaction = () => originalQuery('BEGIN');
   client.commit = () => originalQuery('COMMIT');
   client.rollback = () => originalQuery('ROLLBACK');
-  client.release = () => client.release;
+
+  const originalRelease = client.release.bind(client);
+  client.release = () => {
+    try {
+      originalRelease();
+    } catch (e) {}
+  };
 
   return client;
 };

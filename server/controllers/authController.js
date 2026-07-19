@@ -21,12 +21,14 @@ const generateFamilyCode = () => 'FAM-' + uuidv4().slice(0, 8).toUpperCase();
  * POST /api/auth/register
  */
 const register = async (req, res) => {
-  const client = await pool.getConnection();
+  let client;
   try {
+    client = await pool.getConnection();
     const { firstName, lastName, email, password, phone, familyName } = req.body;
 
     const [existing] = await client.query('SELECT id FROM users WHERE email = ?', [email]);
     if (existing.length > 0) {
+      if (client.release) client.release();
       return res.status(409).json({ message: 'Cet email est déjà utilisé.' });
     }
 
@@ -68,6 +70,7 @@ const register = async (req, res) => {
     await createDefaultSavings(client, familyId);
 
     await client.commit();
+    if (client.release) client.release();
 
     const token = generateToken({ id: userId, email, family_id: familyId });
 
@@ -77,9 +80,28 @@ const register = async (req, res) => {
       user: { id: userId, firstName, lastName, email, role: 'chef', familyId, familyCode, familyName },
     });
   } catch (error) {
-    await client.rollback();
+    if (client) {
+      try { await client.rollback(); } catch (e) {}
+      if (client.release) client.release();
+    }
     console.error('Erreur inscription:', error);
-    res.status(500).json({ message: 'Erreur lors de l\'inscription.' });
+
+    let customMsg = `Erreur lors de l'inscription : ${error.message}`;
+    if (error.code === '42P01') {
+      customMsg = "❌ Erreur SQL (Table introuvable) : Vous n'avez pas encore créé les tables sur Supabase ! Allez dans le SQL Editor de Supabase, copiez-collez le contenu de 'server/config/schema-supabase.sql' et cliquez sur Run.";
+    } else if (error.code === '28P01' || error.message?.includes('password authentication failed')) {
+      customMsg = "❌ Erreur de mot de passe Supabase : Le mot de passe dans DATABASE_URL sur Vercel est incorrect.";
+    } else if (error.code === '23505') {
+      customMsg = "❌ Cet email ou ce nom de famille existe déjà dans la base.";
+    } else if (error.message?.includes('getaddrinfo') || error.message?.includes('ENOTFOUND') || error.message?.includes('timeout')) {
+      customMsg = `❌ Erreur de connexion au serveur Supabase : Vérifiez que l'URI de connexion DATABASE_URL est correcte (${error.message}).`;
+    }
+
+    res.status(500).json({
+      message: customMsg,
+      errorDetail: error.message,
+      errorCode: error.code,
+    });
   }
 };
 
@@ -154,7 +176,7 @@ const login = async (req, res) => {
     });
   } catch (error) {
     console.error('Erreur connexion:', error);
-    res.status(500).json({ message: 'Erreur lors de la connexion.' });
+    res.status(500).json({ message: error.message || 'Erreur lors de la connexion.' });
   }
 };
 
