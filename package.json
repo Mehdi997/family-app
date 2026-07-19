@@ -3,13 +3,14 @@
   "version": "1.0.0",
   "description": "FamilyApp - Application de gestion familiale algérienne full-stack sur Vercel",
   "scripts": {
-    "postinstall": "npm --prefix server install --no-audit --no-fund && npm --prefix client install --no-audit --no-fund",
+    "postinstall": "npm --prefix server install --no-audit --no-fund && npm --prefix client install --include=dev --no-audit --no-fund",
     "build": "npm --prefix client run build && mkdir -p dist && cp -r client/dist/* dist/",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev"
   },
   "dependencies": {
+    "@vitejs/plugin-react": "^6.0.3",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -23,13 +24,12 @@
     "multer": "^2.2.0",
     "node-cron": "^4.6.0",
     "pg": "^8.22.0",
-    "uuid": "^14.0.1"
+    "uuid": "^14.0.1",
+    "vite": "^8.1.1"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "nodemon": "^3.1.14",
-    "vite": "^8.1.1",
-    "@vitejs/plugin-react": "^6.0.3"
+    "nodemon": "^3.1.14"
   },
   "engines": {
     "node": "24.x"
