@@ -4,15 +4,24 @@
  */
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
 /**
- * Configuration du stockage
+ * Configuration du stockage (compatible Vercel Serverless /tmp et local)
  */
 const createStorage = (subfolder) => {
   return multer.diskStorage({
     destination: (req, file, cb) => {
-      cb(null, path.join(__dirname, '..', 'uploads', subfolder));
+      const baseDir = process.env.VERCEL
+        ? path.join('/tmp', 'uploads', subfolder)
+        : path.join(__dirname, '..', 'uploads', subfolder);
+      try {
+        fs.mkdirSync(baseDir, { recursive: true });
+      } catch (err) {
+        console.error('Erreur création dossier:', err);
+      }
+      cb(null, baseDir);
     },
     filename: (req, file, cb) => {
       const ext = path.extname(file.originalname);

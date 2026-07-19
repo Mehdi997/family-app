@@ -41,7 +41,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ─── Fichiers statiques (uploads) ───────────────────
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadsDir = process.env.VERCEL ? '/tmp/uploads' : path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(uploadsDir));
 
 // ─── Appliquer les limiteurs ─────────────────────────
 app.use('/api/', apiLimiter);
@@ -91,13 +92,15 @@ app.use((req, res) => {
   res.status(404).json({ message: 'Route introuvable.' });
 });
 
-// ─── Cron : Notifications automatiques (chaque jour à 8h) ──
-cron.schedule('0 8 * * *', () => {
-  console.log('⏰ Génération des notifications...');
-  generateNotifications();
-});
+// ─── Cron : Notifications automatiques (en local) ──
+if (!process.env.VERCEL) {
+  cron.schedule('0 8 * * *', () => {
+    console.log('⏰ Génération des notifications...');
+    generateNotifications();
+  });
+}
 
-// ─── Démarrage ──────────────────────────────────────
+// ─── Démarrage (en local uniquement, Vercel gère en Serverless via api/index.js) ──
 const PORT = process.env.PORT || 5000;
 
 const start = async () => {
@@ -109,6 +112,8 @@ const start = async () => {
   });
 };
 
-start();
+if (!process.env.VERCEL) {
+  start();
+}
 
 module.exports = app;
