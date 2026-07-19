@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "FamilyApp - Application de gestion familiale algérienne full-stack sur Vercel",
   "scripts": {
-    "build": "cd server && npm install && cd ../client && npm install && npm run build && cd .. && mkdir -p dist && cp -r client/dist/* dist/",
+    "build": "npm --prefix server install --no-audit --no-fund && npm --prefix client install --no-audit --no-fund && npm --prefix client run build && mkdir -p dist && cp -r client/dist/* dist/",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev"
@@ -29,6 +29,6 @@
     "nodemon": "^3.1.14"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "20.x"
   }
 }
