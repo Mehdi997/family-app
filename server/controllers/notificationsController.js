@@ -1,6 +1,3 @@
-/**
- * Contrôleur des notifications - PostgreSQL
- */
 const { pool } = require('../config/database');
 
 const getNotifications = async (req, res) => {
@@ -47,6 +44,55 @@ const deleteNotification = async (req, res) => {
   } catch (error) { console.error(error); res.status(500).json({ message: 'Erreur.' }); }
 };
 
+const generateMonthlyIncomes = async () => {
+  try {
+    const [monthlyIncomes] = await pool.query(
+      `SELECT * FROM incomes WHERE frequency = 'monthly'`
+    );
+
+    const today = new Date();
+    const currentMonth = today.getMonth() + 1;
+    const currentYear = today.getFullYear();
+    const currentDay = today.getDate();
+
+    const lastDayOfMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+    for (const inc of monthlyIncomes) {
+      if (!inc.date) continue;
+      const incDate = new Date(inc.date);
+      const incDay = incDate.getDate();
+      const targetDay = Math.min(incDay, lastDayOfMonth);
+
+      if (currentDay === targetDay) {
+        const [existing] = await pool.query(
+          `SELECT id FROM incomes 
+           WHERE family_id = ? AND user_id = ? AND label = ? AND amount = ? 
+           AND EXTRACT(MONTH FROM date) = ? AND EXTRACT(YEAR FROM date) = ?`,
+          [inc.family_id, inc.user_id, inc.label, inc.amount, currentMonth, currentYear]
+        );
+
+        if (existing.length === 0) {
+          const newDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`;
+          await pool.query(
+            `INSERT INTO incomes (family_id, user_id, type, label, amount, frequency, date, notes)
+             VALUES (?, ?, ?, ?, ?, 'monthly', ?, ?)`,
+            [inc.family_id, inc.user_id, inc.type || 'salary', inc.label, inc.amount, newDateStr, 'Généré automatiquement']
+          );
+
+          await pool.query(
+            `INSERT INTO notifications (family_id, type, title, message, reference_type, reference_id)
+             VALUES (?, 'salary_auto', ?, ?, 'income', 0)`,
+            [inc.family_id, `💰 Salaire reçu : ${inc.label}`, `Le revenu mensuel "${inc.label}" (${inc.amount} DA) a été ajouté automatiquement pour ce mois.`]
+          );
+          console.log(`✅ Salaire mensuel généré : ${inc.label} (${inc.amount} DA) pour famille ${inc.family_id}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('❌ Erreur génération salaires mensuels:', err);
+  }
+};
+
 const generateNotifications = async () => {
   try {
     const dayOffsets = [30, 15, 7, 3, 1];
@@ -78,14 +124,15 @@ const generateNotifications = async () => {
       }
     }
 
-    // Factures en retard
     await pool.query(
       `UPDATE bill_payments SET status = 'overdue'
        WHERE due_date < CURRENT_DATE AND status = 'pending'
        AND bill_id IN (SELECT id FROM bills WHERE is_active = TRUE)`
     );
 
-    console.log('✅ Notifications générées');
+    await generateMonthlyIncomes();
+
+    console.log('✅ Notifications et salaires mensuels générés');
   } catch (error) {
     console.error('❌ Erreur notifications:', error);
   }
