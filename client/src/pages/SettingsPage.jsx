@@ -1,6 +1,3 @@
-/**
- * Page des paramètres
- */
 import { useState, useEffect } from 'react';
 import {
   Box, Card, CardContent, Typography, Grid, TextField, Button,
@@ -53,6 +50,16 @@ const SettingsPage = () => {
     } catch (err) { console.error(err); }
   };
 
+  const handleTestEmail = async () => {
+    try {
+      setMessage('📧 Envoi de l\'email de test en cours...');
+      const { data } = await api.post('/settings/test-email');
+      setMessage(data.message);
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Erreur lors de l\'envoi de l\'email.');
+    }
+  };
+
   const handleAddCategory = async () => {
     await api.post('/settings/categories', catForm);
     setCatDialogOpen(false);
@@ -87,7 +94,6 @@ const SettingsPage = () => {
         <Tab icon={<Notifications />} label="Notifications" iconPosition="start" />
       </Tabs>
 
-      {/* Général */}
       {tab === 0 && (
         <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
@@ -132,7 +138,6 @@ const SettingsPage = () => {
         </Grid>
       )}
 
-      {/* Catégories */}
       {tab === 1 && (
         <Card>
           <CardContent sx={{ p: 3 }}>
@@ -161,7 +166,6 @@ const SettingsPage = () => {
         </Card>
       )}
 
-      {/* Membres */}
       {tab === 2 && (
         <Card>
           <CardContent sx={{ p: 3 }}>
@@ -183,30 +187,31 @@ const SettingsPage = () => {
         </Card>
       )}
 
-      {/* Notifications */}
       {tab === 3 && (
         <Card>
           <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" fontWeight={700} gutterBottom>Notifications</Typography>
+            <Typography variant="h6" fontWeight={700} gutterBottom>Notifications par Email & Application</Typography>
             <FormControlLabel
               control={<Switch checked={settings.notifications_enabled !== false}
                 onChange={(e) => setSettings({ ...settings, notifications_enabled: e.target.checked })} />}
-              label="Activer les notifications"
+              label="Activer les alertes automatiques"
             />
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 2 }}>
-              <Button variant="contained" onClick={handleSaveSettings}>Sauvegarder</Button>
-              <Button variant="outlined" color="primary" onClick={async () => {
-                try {
-                  const { data } = await api.post('/settings/test-email');
-                  alert(data.message);
-                } catch (err) { alert(err.response?.data?.message || 'Erreur.'); }
-              }}>📧 Tester l'envoi d'un email maintenant</Button>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 3 }}>
+              Lorsqu'activées, vous recevrez automatiquement les alertes des échéances de factures et de salaires par email.
+            </Typography>
+
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              <Button variant="contained" onClick={handleSaveSettings}>
+                Sauvegarder
+              </Button>
+              <Button variant="outlined" color="primary" onClick={handleTestEmail}>
+                📧 Tester l'envoi d'un email maintenant
+              </Button>
             </Box>
           </CardContent>
         </Card>
       )}
 
-      {/* Dialog catégorie */}
       <Dialog open={catDialogOpen} onClose={() => setCatDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle fontWeight={700}>Nouvelle catégorie</DialogTitle>
         <DialogContent>
@@ -229,7 +234,6 @@ const SettingsPage = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Dialog invitation */}
       <Dialog open={inviteDialogOpen} onClose={() => setInviteDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle fontWeight={700}>Inviter un membre</DialogTitle>
         <DialogContent>
