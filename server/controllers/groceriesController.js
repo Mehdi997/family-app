@@ -23,7 +23,7 @@ const getList = async (req, res) => {
   try {
     const [lists] = await pool.query('SELECT * FROM grocery_lists WHERE id = ? AND family_id = ?', [req.params.id, req.user.family_id]);
     if (lists.length === 0) return res.status(404).json({ message: 'Liste introuvable.' });
-    const [items] = await pool.query('SELECT * FROM grocery_items WHERE list_id = ? ORDER BY category, name', [req.params.id]);
+    const [items] = await pool.query('SELECT * FROM grocery_items WHERE list_id = ? ORDER BY id ASC', [req.params.id]);
     res.json({ list: lists[0], items });
   } catch (error) { res.status(500).json({ message: 'Erreur.' }); }
 };
@@ -33,6 +33,28 @@ const createList = async (req, res) => {
     const { name, type, budget, store, date, notes } = req.body;
     const [result] = await pool.query('INSERT INTO grocery_lists (family_id, name, type, budget, store, date, notes) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id', [req.user.family_id, name, type || 'weekly', budget || null, store || null, date || null, notes || null]);
     res.status(201).json({ message: 'Liste créée.', id: result[0].id });
+  } catch (error) { res.status(500).json({ message: 'Erreur.' }); }
+};
+
+const duplicateList = async (req, res) => {
+  try {
+    const [originalLists] = await pool.query('SELECT * FROM grocery_lists WHERE id = ? AND family_id = ?', [req.params.id, req.user.family_id]);
+    if (originalLists.length === 0) return res.status(404).json({ message: 'Liste introuvable.' });
+    const orig = originalLists[0];
+    const todayStr = new Date().toISOString().split('T')[0];
+    const [listResult] = await pool.query(
+      'INSERT INTO grocery_lists (family_id, name, type, budget, store, date, notes) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
+      [req.user.family_id, `${orig.name} (copie)`, orig.type, orig.budget, orig.store, todayStr, orig.notes]
+    );
+    const newListId = listResult[0].id;
+    const [items] = await pool.query('SELECT * FROM grocery_items WHERE list_id = ?', [req.params.id]);
+    for (const item of items) {
+      await pool.query(
+        'INSERT INTO grocery_items (list_id, name, quantity, unit, estimated_price, category, is_checked) VALUES (?, ?, ?, ?, ?, ?, FALSE)',
+        [newListId, item.name, item.quantity || 1, item.unit || null, item.estimated_price || null, item.category || null]
+      );
+    }
+    res.status(201).json({ message: 'Liste dupliquée avec succès !', id: newListId });
   } catch (error) { res.status(500).json({ message: 'Erreur.' }); }
 };
 
@@ -47,7 +69,7 @@ const addItem = async (req, res) => {
 const updateItem = async (req, res) => {
   try {
     const { name, quantity, unit, estimatedPrice, actualPrice, category, isChecked } = req.body;
-    await pool.query(`UPDATE grocery_items SET name = ?, quantity = ?, unit = ?, estimated_price = ?, actual_price = ?, category = ?, is_checked = ? WHERE id = ?`, [name, quantity, unit, estimatedPrice, actualPrice || null, category, isChecked || false, req.params.itemId]);
+    await pool.query(`UPDATE grocery_items SET name = ?, quantity = ?, unit = ?, estimated_price = ?, actual_price = ?, category = ?, is_checked = ? WHERE id = ?`, [name, quantity || 1, unit || null, estimatedPrice || 0, actualPrice || null, category || null, isChecked || false, req.params.itemId]);
     res.json({ message: 'Article mis à jour.' });
   } catch (error) { res.status(500).json({ message: 'Erreur.' }); }
 };
@@ -75,4 +97,4 @@ const deleteItem = async (req, res) => {
   } catch (error) { res.status(500).json({ message: 'Erreur.' }); }
 };
 
-module.exports = { getLists, getList, createList, addItem, updateItem, toggleItem, deleteList, deleteItem };
+module.exports = { getLists, getList, createList, duplicateList, addItem, updateItem, toggleItem, deleteList, deleteItem };

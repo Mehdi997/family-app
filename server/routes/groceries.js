@@ -7,6 +7,7 @@ router.use(authenticate, hasFamily);
 router.get('/', ctrl.getLists);
 router.get('/:id', ctrl.getList);
 router.post('/', ctrl.createList);
+router.post('/:id/duplicate', ctrl.duplicateList);
 router.post('/:id/items', ctrl.addItem);
 router.put('/items/:itemId', ctrl.updateItem);
 router.put('/items/:itemId/toggle', ctrl.toggleItem);
