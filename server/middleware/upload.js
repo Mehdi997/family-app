@@ -1,15 +1,8 @@
-/**
- * Configuration Multer pour l'upload de fichiers
- * Gère les avatars, factures, reçus, documents, etc.
- */
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { randomUUID: uuidv4 } = require('crypto');
 
-/**
- * Configuration du stockage (compatible Vercel Serverless /tmp et local)
- */
 const createStorage = (subfolder) => {
   return multer.diskStorage({
     destination: (req, file, cb) => {
@@ -31,9 +24,6 @@ const createStorage = (subfolder) => {
   });
 };
 
-/**
- * Filtre pour les images
- */
 const imageFilter = (req, file, cb) => {
   const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
   if (allowedTypes.includes(file.mimetype)) {
@@ -43,9 +33,6 @@ const imageFilter = (req, file, cb) => {
   }
 };
 
-/**
- * Filtre pour les documents
- */
 const documentFilter = (req, file, cb) => {
   const allowedTypes = [
     'image/jpeg', 'image/png', 'image/gif', 'image/webp',
@@ -60,17 +47,16 @@ const documentFilter = (req, file, cb) => {
   }
 };
 
-// ─── Uploaders configurés ───
 const uploadAvatar = multer({
   storage: createStorage('avatars'),
   fileFilter: imageFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 
 const uploadDocument = multer({
   storage: createStorage('documents'),
   fileFilter: documentFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  limits: { fileSize: 10 * 1024 * 1024 },
 });
 
 const uploadInvoice = multer({
