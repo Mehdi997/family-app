@@ -27,7 +27,9 @@ const registerRules = [
   body('password')
     .isLength({ min: 6 })
     .withMessage('Le mot de passe doit contenir au moins 6 caractères.'),
-  body('familyName').trim().notEmpty().withMessage('Le nom de famille est requis.'),
+  body('familyName')
+    .if((value, { req }) => !req.body.familyCode || req.body.familyCode.trim() === '')
+    .trim().notEmpty().withMessage('Le nom de famille est requis si vous ne rejoignez pas avec un Code Famille.'),
 ];
 
 const loginRules = [
