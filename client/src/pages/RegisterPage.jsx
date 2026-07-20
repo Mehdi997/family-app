@@ -16,7 +16,7 @@ const RegisterPage = () => {
   const { register } = useAuth();
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', password: '',
-    confirmPassword: '', phone: '', familyName: '', familyCode: '',
+    confirmPassword: '', phone: '', familyName: '', familyCode: '', familyCode: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
