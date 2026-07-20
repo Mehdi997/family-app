@@ -1,7 +1,3 @@
-/**
- * Contrôleur d'authentification
- * Compatible PostgreSQL (Supabase)
- */
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -17,9 +13,6 @@ const generateToken = (user) => {
 
 const generateFamilyCode = () => 'FAM-' + uuidv4().slice(0, 8).toUpperCase();
 
-/**
- * POST /api/auth/register
- */
 const register = async (req, res) => {
   let client;
   try {
@@ -34,7 +27,6 @@ const register = async (req, res) => {
 
     await client.beginTransaction();
 
-    // Créer la famille
     const familyCode = generateFamilyCode();
     const [familyResult] = await client.query(
       'INSERT INTO families (name, code) VALUES (?, ?) RETURNING id',
@@ -42,10 +34,7 @@ const register = async (req, res) => {
     );
     const familyId = familyResult[0].id;
 
-    // Hasher le mot de passe
     const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Créer l'utilisateur (chef de famille)
     const [userResult] = await client.query(
       `INSERT INTO users (family_id, first_name, last_name, email, password, phone, role)
        VALUES (?, ?, ?, ?, ?, ?, 'chef') RETURNING id`,
@@ -53,27 +42,19 @@ const register = async (req, res) => {
     );
     const userId = userResult[0].id;
 
-    // Paramètres par défaut
     await client.query('INSERT INTO settings (family_id) VALUES (?)', [familyId]);
-
-    // Copier les catégories par défaut
     await client.query(
       `INSERT INTO categories (family_id, name, type, icon, color, is_default)
        SELECT ?, name, type, icon, color, TRUE FROM categories WHERE family_id IS NULL`,
       [familyId]
     );
-
-    // Factures algériennes préconfigurées
     await createAlgerianBills(client, familyId, userId);
-
-    // Enveloppes d'économies par défaut
     await createDefaultSavings(client, familyId);
 
     await client.commit();
     if (client.release) client.release();
 
     const token = generateToken({ id: userId, email, family_id: familyId });
-
     res.status(201).json({
       message: 'Compte créé avec succès !',
       token,
@@ -97,11 +78,7 @@ const register = async (req, res) => {
       customMsg = `❌ Erreur de connexion au serveur Supabase : Vérifiez que l'URI de connexion DATABASE_URL est correcte (${error.message}).`;
     }
 
-    res.status(500).json({
-      message: customMsg,
-      errorDetail: error.message,
-      errorCode: error.code,
-    });
+    res.status(500).json({ message: customMsg, errorDetail: error.message, errorCode: error.code });
   }
 };
 
@@ -142,29 +119,20 @@ const createDefaultSavings = async (client, familyId) => {
   }
 };
 
-/**
- * POST /api/auth/login
- */
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
     const [users] = await pool.query(
       `SELECT u.*, f.name as family_name, f.code as family_code
-       FROM users u LEFT JOIN families f ON u.family_id = f.id
-       WHERE u.email = ?`,
+       FROM users u LEFT JOIN families f ON u.family_id = f.id WHERE u.email = ?`,
       [email]
     );
-
     if (users.length === 0) return res.status(401).json({ message: 'Email ou mot de passe incorrect.' });
     const user = users[0];
     if (!user.is_active) return res.status(403).json({ message: 'Votre compte est désactivé.' });
-
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) return res.status(401).json({ message: 'Email ou mot de passe incorrect.' });
-
     const token = generateToken(user);
-
     res.json({
       message: 'Connexion réussie !',
       token,
@@ -180,7 +148,6 @@ const login = async (req, res) => {
   }
 };
 
-/** GET /api/auth/me */
 const getProfile = async (req, res) => {
   try {
     const [users] = await pool.query(
@@ -190,7 +157,6 @@ const getProfile = async (req, res) => {
       [req.user.id]
     );
     if (users.length === 0) return res.status(404).json({ message: 'Utilisateur introuvable.' });
-
     const user = users[0];
     let members = [];
     if (user.family_id) {
@@ -200,7 +166,6 @@ const getProfile = async (req, res) => {
       );
       members = m;
     }
-
     res.json({
       user: {
         id: user.id, firstName: user.first_name, lastName: user.last_name,
@@ -215,12 +180,10 @@ const getProfile = async (req, res) => {
   }
 };
 
-/** PUT /api/auth/profile */
 const updateProfile = async (req, res) => {
   try {
     const { firstName, lastName, phone } = req.body;
     const avatar = req.file ? `/uploads/avatars/${req.file.filename}` : undefined;
-
     if (avatar) {
       await pool.query('UPDATE users SET first_name = ?, last_name = ?, phone = ?, avatar = ? WHERE id = ?',
         [firstName, lastName, phone || null, avatar, req.user.id]);
@@ -235,14 +198,12 @@ const updateProfile = async (req, res) => {
   }
 };
 
-/** PUT /api/auth/password */
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const [users] = await pool.query('SELECT password FROM users WHERE id = ?', [req.user.id]);
     const isValid = await bcrypt.compare(currentPassword, users[0].password);
     if (!isValid) return res.status(400).json({ message: 'Mot de passe actuel incorrect.' });
-
     const hashed = await bcrypt.hash(newPassword, 12);
     await pool.query('UPDATE users SET password = ? WHERE id = ?', [hashed, req.user.id]);
     res.json({ message: 'Mot de passe modifié.' });
@@ -252,18 +213,15 @@ const changePassword = async (req, res) => {
   }
 };
 
-/** POST /api/auth/forgot-password */
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
     const [users] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
     if (users.length === 0) return res.json({ message: 'Si cet email existe, un lien a été envoyé.' });
-
     const resetToken = uuidv4();
     const expires = new Date(Date.now() + 3600000);
     await pool.query('UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?',
       [resetToken, expires, users[0].id]);
-
     res.json({
       message: 'Si cet email existe, un lien a été envoyé.',
       ...(process.env.NODE_ENV === 'development' && { resetToken }),
@@ -274,14 +232,12 @@ const forgotPassword = async (req, res) => {
   }
 };
 
-/** POST /api/auth/reset-password */
 const resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body;
     const [users] = await pool.query(
       'SELECT id FROM users WHERE reset_token = ? AND reset_token_expires > NOW()', [token]);
     if (users.length === 0) return res.status(400).json({ message: 'Token invalide ou expiré.' });
-
     const hashed = await bcrypt.hash(newPassword, 12);
     await pool.query('UPDATE users SET password = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?',
       [hashed, users[0].id]);
@@ -292,14 +248,12 @@ const resetPassword = async (req, res) => {
   }
 };
 
-/** POST /api/auth/invite */
 const inviteMember = async (req, res) => {
   try {
     const { email, role } = req.body;
     const [existing] = await pool.query('SELECT id FROM users WHERE email = ? AND family_id = ?',
       [email, req.user.family_id]);
     if (existing.length > 0) return res.status(409).json({ message: 'Déjà membre.' });
-
     const token = uuidv4();
     const expires = new Date(Date.now() + 7 * 24 * 3600000);
     await pool.query(
@@ -313,7 +267,6 @@ const inviteMember = async (req, res) => {
   }
 };
 
-/** POST /api/auth/join */
 const joinFamily = async (req, res) => {
   try {
     const { inviteToken } = req.body;
@@ -324,12 +277,10 @@ const joinFamily = async (req, res) => {
       [inviteToken]
     );
     if (invitations.length === 0) return res.status(400).json({ message: 'Invitation invalide.' });
-
     const inv = invitations[0];
     await pool.query('UPDATE users SET family_id = ?, role = ? WHERE id = ?',
       [inv.family_id, inv.role, req.user.id]);
     await pool.query("UPDATE invitations SET status = 'accepted' WHERE id = ?", [inv.id]);
-
     res.json({ message: `Famille ${inv.family_name} rejointe !`, familyId: inv.family_id, familyName: inv.family_name });
   } catch (error) {
     console.error('Erreur:', error);
