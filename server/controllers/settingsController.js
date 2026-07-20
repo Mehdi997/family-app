@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { sendEmail } = require('../utils/email');
 
 const getSettings = async (req, res) => {
   try {
@@ -16,6 +17,37 @@ const updateSettings = async (req, res) => {
     await pool.query(`UPDATE settings SET currency = ?, language = ?, theme = ?, notifications_enabled = ?, weekly_budget = ?, monthly_budget = ? WHERE family_id = ?`, [currency || 'DA', language || 'fr', theme || 'auto', notificationsEnabled !== false, weeklyBudget || null, monthlyBudget || null, req.user.family_id]);
     res.json({ message: 'Paramètres mis à jour.' });
   } catch (error) { res.status(500).json({ message: 'Erreur.' }); }
+};
+
+const testEmail = async (req, res) => {
+  try {
+    const [users] = await pool.query('SELECT email, first_name FROM users WHERE id = ?', [req.user.id]);
+    const userEmail = users[0]?.email;
+    if (!userEmail) return res.status(400).json({ message: 'Email introuvable.' });
+
+    const success = await sendEmail({
+      to: userEmail,
+      subject: '🚀 Test réussi ! Vos notifications FamilyApp fonctionnent',
+      text: `Bonjour ${users[0]?.first_name || ''} !\n\nFélicitations, la connexion entre votre serveur Vercel et Gmail est parfaitement configurée !\n\nVous recevrez désormais vos rappels automatiques d'échéances de factures et de salaires sur cette adresse email.\n\nÀ très vite sur FamilyApp !`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; max-width: 500px; margin: 0 auto; background-color: #f8fafc;">
+          <h2 style="color: #4f46e5; text-align: center;">🚀 Configuration Gmail réussie !</h2>
+          <p style="font-size: 16px; color: #334155;">Bonjour <strong>${users[0]?.first_name || ''}</strong>,</p>
+          <p style="font-size: 15px; color: #475569;">Votre serveur Vercel est maintenant connecté en direct à votre compte Gmail.</p>
+          <div style="background-color: #dcfce7; padding: 15px; border-radius: 8px; text-align: center; margin: 20px 0; border: 1px solid #86efac;">
+            <strong style="color: #166534; font-size: 16px;">✅ Envoi des alertes opérationnel</strong>
+          </div>
+          <p style="color: #64748b; font-size: 13px;">Vous recevrez automatiquement vos rappels de factures (à 7j, 3j, 1j) et vos alertes de salaires mensuels.</p>
+        </div>
+      `
+    });
+
+    if (success) {
+      res.json({ message: `Email de test expédié avec succès à ${userEmail} ! Vérifiez votre boîte de réception (et les spams).` });
+    } else {
+      res.status(500).json({ message: "Échec de l'envoi. Vérifiez que GMAIL_USER et GMAIL_APP_PASSWORD sont bien configurés sur Vercel." });
+    }
+  } catch (error) { res.status(500).json({ message: 'Erreur lors du test email.' }); }
 };
 
 const createCategory = async (req, res) => {
@@ -41,4 +73,4 @@ const deleteCategory = async (req, res) => {
   } catch (error) { res.status(500).json({ message: 'Erreur.' }); }
 };
 
-module.exports = { getSettings, updateSettings, createCategory, updateCategory, deleteCategory };
+module.exports = { getSettings, updateSettings, testEmail, createCategory, updateCategory, deleteCategory };

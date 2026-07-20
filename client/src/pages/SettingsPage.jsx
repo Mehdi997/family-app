@@ -193,9 +193,15 @@ const SettingsPage = () => {
                 onChange={(e) => setSettings({ ...settings, notifications_enabled: e.target.checked })} />}
               label="Activer les notifications"
             />
-            <Button variant="contained" sx={{ mt: 2, display: 'block' }} onClick={handleSaveSettings}>
-              Sauvegarder
-            </Button>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 2 }}>
+              <Button variant="contained" onClick={handleSaveSettings}>Sauvegarder</Button>
+              <Button variant="outlined" color="primary" onClick={async () => {
+                try {
+                  const { data } = await api.post('/settings/test-email');
+                  alert(data.message);
+                } catch (err) { alert(err.response?.data?.message || 'Erreur.'); }
+              }}>📧 Tester l'envoi d'un email maintenant</Button>
+            </Box>
           </CardContent>
         </Card>
       )}
