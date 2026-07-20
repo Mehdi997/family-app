@@ -17,16 +17,19 @@ const { testConnection } = require('./config/database');
 const { generateNotifications } = require('./controllers/notificationsController');
 
 const app = express();
+app.set('trust proxy', 1);
 
 // ─── Rate Limiting (protection brute force) ─────────
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
+  validate: { xForwardedForHeader: false },
   message: { message: 'Trop de requêtes, réessayez dans 15 minutes.' },
 });
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
+  validate: { xForwardedForHeader: false },
   message: { message: 'Trop de tentatives, réessayez dans 15 minutes.' },
 });
 
