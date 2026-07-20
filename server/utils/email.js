@@ -1,25 +1,58 @@
 const nodemailer = require('nodemailer');
 
 const sendEmail = async ({ to, subject, text, html }) => {
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-    console.log(`📧 [EMAIL NON CONFIGURÉ] À: ${to} | Sujet: ${subject}`);
-    return false;
+  const formattedHtml = html || `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">${text.replace(/\n/g, '<br/>')}</div>`;
+
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'FamilyApp <onboarding@resend.dev>',
+          to: [to],
+          subject,
+          text,
+          html: formattedHtml,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        console.log(`✅ Email envoyé via Resend à ${to} (ID: ${data.id})`);
+        return true;
+      } else {
+        console.error('❌ Erreur API Resend:', JSON.stringify(data));
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Erreur réseau Resend:', error.message);
+      return false;
+    }
   }
-  try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-    });
-    await transporter.sendMail({
-      from: `"FamilyApp" <${process.env.GMAIL_USER}>`,
-      to, subject, text,
-      html: html || `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">${text.replace(/\n/g, '<br/>')}</div>`,
-    });
-    console.log(`✅ Email envoyé avec succès à ${to}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Erreur envoi email:', error.message);
-    return false;
+
+  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+      });
+      await transporter.sendMail({
+        from: `"FamilyApp" <${process.env.GMAIL_USER}>`,
+        to, subject, text, html: formattedHtml,
+      });
+      console.log(`✅ Email envoyé via Gmail à ${to}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur Gmail:', error.message);
+      return false;
+    }
   }
+
+  console.log(`📧 [EMAIL NON CONFIGURÉ SUR VERCEL] À: ${to} | Sujet: ${subject}`);
+  return false;
 };
+
 module.exports = { sendEmail };
