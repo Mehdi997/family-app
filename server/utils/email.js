@@ -3,51 +3,21 @@ const nodemailer = require('nodemailer');
 const sendEmail = async ({ to, subject, text, html }) => {
   const formattedHtml = html || `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">${text.replace(/\n/g, '<br/>')}</div>`;
 
-  if (process.env.RESEND_API_KEY) {
-    try {
-      const response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: 'FamilyApp <onboarding@resend.dev>',
-          to: [to], subject, text, html: formattedHtml,
-        }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        console.log(`✅ Email envoyé via Resend à ${to} (ID: ${data.id})`);
-        return true;
-      } else {
-        console.error('❌ Erreur API Resend (bascule vers Hotmail/Gmail...):', JSON.stringify(data));
-      }
-    } catch (error) { console.error('❌ Erreur réseau Resend:', error.message); }
-  }
-
-  const hotmailUser = process.env.HOTMAIL_USER || process.env.OUTLOOK_USER;
-  const hotmailPass = process.env.HOTMAIL_PASSWORD || process.env.OUTLOOK_PASSWORD;
-
-  if (hotmailUser && hotmailPass) {
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
     try {
       const transporter = nodemailer.createTransport({
-        host: 'smtp-mail.outlook.com',
-        port: 587,
-        secure: false,
-        auth: { user: hotmailUser, pass: hotmailPass },
-        tls: { ciphers: 'SSLv3', rejectUnauthorized: false }
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_PORT === '465',
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
       });
       await transporter.sendMail({
-        from: `"FamilyApp" <${hotmailUser}>`,
+        from: `"FamilyApp" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
         to, subject, text, html: formattedHtml,
       });
-      console.log(`✅ Email envoyé via Hotmail/Outlook à ${to}`);
+      console.log(`✅ Email envoyé via SMTP (${process.env.SMTP_HOST}) à ${to}`);
       return true;
-    } catch (error) {
-      console.error('❌ Erreur Hotmail/Outlook:', error.message);
-      return false;
-    }
+    } catch (error) { console.error('❌ Erreur SMTP:', error.message); return false; }
   }
 
   if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
@@ -63,6 +33,18 @@ const sendEmail = async ({ to, subject, text, html }) => {
       console.log(`✅ Email envoyé via Gmail à ${to}`);
       return true;
     } catch (error) { console.error('❌ Erreur Gmail:', error.message); return false; }
+  }
+
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: 'FamilyApp <onboarding@resend.dev>', to: [to], subject, text, html: formattedHtml }),
+      });
+      const data = await response.json();
+      if (response.ok) { console.log(`✅ Email envoyé via Resend à ${to}`); return true; }
+    } catch (error) {}
   }
 
   console.log(`📧 [EMAIL NON CONFIGURÉ] À: ${to} | Sujet: ${subject}`);
